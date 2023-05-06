@@ -11,6 +11,7 @@
   "dependencies": {
     "@nuxtjs/axios": "^5.13.6",
     "core-js": "^3.25.3",
+    "neo4j-driver": "^5.8.0",
     "nuxt": "^2.15.8",
     "vue": "^2.7.10",
     "vue-server-renderer": "^2.7.10",
