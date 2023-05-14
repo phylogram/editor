@@ -1,13 +1,16 @@
 <template>
   <v-container>
     <v-row>
-      <v-col>
+      <v-col >
           <v-select
             label="NodeType"
             :items="nodeTypes"
             v-model="nodeType"
           >
           </v-select>
+      </v-col>
+      <v-col md="auto">
+        <v-btn icon x-small @click="loadNodeTypes()" ><v-icon>mdi-refresh</v-icon> </v-btn>
       </v-col>
       <v-col>
         <v-select
@@ -18,6 +21,9 @@
         >
         </v-select>
       </v-col>
+      <v-col md="auto">
+        <v-btn v-if="nodeType" icon x-small @click="loadRelationTypes()" ><v-icon>mdi-refresh</v-icon> </v-btn>
+      </v-col>
       <v-col>
         <v-select
           v-if="relationType"
@@ -27,7 +33,6 @@
         >
         </v-select>
       </v-col>
-
       <v-col>
         <v-select
           v-if="relationType"
@@ -36,6 +41,9 @@
           v-model="nodeContentKey"
         >
         </v-select>
+      </v-col>
+      <v-col md="auto">
+        <v-btn v-if="relationType" icon x-small @click="loadStartNodeOptions()" ><v-icon>mdi-refresh</v-icon> </v-btn>
       </v-col>
     </v-row>
     <v-col>
@@ -48,7 +56,9 @@
       </v-select>
     </v-col>
     <v-row>
-      <v-btn large @click="updateNodes()">Update</v-btn>
+      <v-col md="auto">
+        <v-btn large @click="loadNodes()">Update Nodes</v-btn>
+      </v-col>
     </v-row>
     <v-row v-if="nodeContentKey">
         <span
@@ -61,9 +71,6 @@
           {{node.properties[nodeContentKey]}}
         </span>
 
-    </v-row>
-    <v-row>
-      Add node with relationship
     </v-row>
   </v-container>
 </template>
@@ -139,7 +146,11 @@ export default {
       return text.includes('\n');
     },
     updateNode(event) {
-      console.debug(event);
+      const target = event.target;
+      const content = target.innerText;
+      const elementId = target.id;
+      const node = this.nodes.find(node => node.elementId === elementId);
+      node.properties[this.nodeContentKey] = content;
     },
     updateNodes() {
       for (const node of this.nodes) {
@@ -161,6 +172,7 @@ export default {
       this.relationTypes = this.getResultFields(result);
     },
     async loadStartNodeOptions() {
+
       if (this.nodeType === null || this.relationType === null) {
         return;
       }
