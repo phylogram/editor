@@ -51,7 +51,15 @@
       <v-btn large @click="updateNodes()">Update</v-btn>
     </v-row>
     <v-row v-if="nodeContentKey">
-        <span  v-for="node in nodes" :id="node.elementId"  @input="updateNode($event)" contenteditable="true" >{{node.properties[nodeContentKey]}}</span>
+        <span
+          v-for="(node, index) in nodes"
+          :id="node.elementId"
+          @input="updateNode($event)"
+          contenteditable="true"
+          @keydown="reactToLeaveNode(index, $event)"
+        >
+          {{node.properties[nodeContentKey]}}
+        </span>
 
     </v-row>
     <v-row>
@@ -61,7 +69,8 @@
 </template>
 
 <script>
-import {Driver, session} from "neo4j-driver";
+import {Driver} from "neo4j-driver";
+import {nextTick} from "vue";
 
 export default {
   name: 'IndexPage',
@@ -182,6 +191,29 @@ WHERE NOT (:${this.nodeType})-[:${this.relationType}]->(subject)
           };
         }
       );
+    },
+
+    async reactToLeaveNode(index, event) {
+      if (index < (this.nodes.length - 1 )) {
+        return;
+      }
+      if (!(event.ctrlKey && event.key === '<')) {
+        return;
+      }
+      const sourceId = this.nodes[this.nodes.length - 1].elementId;
+      const result = await this.session.executeWrite(tx => tx.run(`CREATE (newText:${this.nodeType} {${this.nodeContentKey}: ""}) RETURN elementId(newText) as newId`));
+      const destinationId = result.records[0].get('newId');
+      console.debug({sourceId, destinationId});
+      await this.session.executeWrite(
+        tx => tx.run(`MATCH (source:${this.nodeType}), (destination:${this.nodeType})
+WHERE elementID(source) = $sourceId AND elementID(destination) = $destinationId
+CREATE (source)-[:${this.relationType}]->(destination);`, {sourceId, destinationId})
+      );
+      this.nodes.push({elementId: destinationId, properties: {[this.nodeContentKey]: ''}});
+
+      await nextTick();
+
+      document.getElementById(destinationId).focus();
     }
   },
 }
