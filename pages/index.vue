@@ -30,6 +30,13 @@
 <script>
 import * as neo4j from "neo4j-driver";
 
+const USERNAME_KEY = "USERNAME_KEY";
+
+const PASSWORD_KEY = "PASSWORD_KEY";
+
+const URI_KEY = "URI_KEY";
+
+
 export default {
   name: 'DefaultLayout',
   data() {
@@ -59,14 +66,34 @@ export default {
   methods: {
     async login() {
       if (!(this.uri && this.username && this.password)) {
-        window.alert('Fehlende Logondaten');
+        throw new Error('Missing login data data');
       }
       this.driver = neo4j.driver(this.uri, neo4j.auth.basic(this.username, this.password));
       this.connected = await this.driver.verifyAuthentication();
+    },
+    async tryToLoadLoginData() {
+        this.uri = window.localStorage.getItem(URI_KEY);
+        this.username = window.localStorage.getItem(USERNAME_KEY);
+        this.password = window.localStorage.getItem(PASSWORD_KEY);
     }
+  },
+  watch: {
+    uri() {
+      window.localStorage.setItem(URI_KEY, this.uri);
+    },
+    username() {
+      window.localStorage.setItem(USERNAME_KEY, this.username);
+    },
+    password() {
+      window.localStorage.setItem(PASSWORD_KEY, this.password);
+    },
   },
   beforeDestroy() {
     this.driver.close();
+  },
+
+  mounted() {
+    this.tryToLoadLoginData().then(this.login);
   }
 }
 </script>
