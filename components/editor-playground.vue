@@ -226,8 +226,18 @@ CREATE (source)-[:${this.relationType}]->(destination);`, {sourceId, destination
       await nextTick();
 
       document.getElementById(destinationId).focus();
-    }
+    },
+    async closeSession() {
+      this.session.closeSession();
+      console.debug('Closed session');
+    },
   },
+  mounted() {
+    window.onbeforeunload = () => this.closeSession();
+  },
+  async beforeDestroy() {
+    await this.closeSession();
+  }
 }
 </script>
 <style>

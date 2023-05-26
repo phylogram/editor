@@ -75,7 +75,11 @@ export default {
         this.uri = window.localStorage.getItem(URI_KEY);
         this.username = window.localStorage.getItem(USERNAME_KEY);
         this.password = window.localStorage.getItem(PASSWORD_KEY);
-    }
+    },
+    cleanUp() {
+      this.driver.close();
+      console.debug('Closed driver');
+    },
   },
   watch: {
     uri() {
@@ -89,11 +93,12 @@ export default {
     },
   },
   beforeDestroy() {
-    this.driver.close();
+    this.cleanUp();
   },
 
   mounted() {
     this.tryToLoadLoginData().then(this.login);
+    window.onbeforeunload = () => this.cleanUp();
   }
 }
 </script>
