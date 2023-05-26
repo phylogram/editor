@@ -57,7 +57,10 @@
     </v-col>
     <v-row>
       <v-col md="auto">
-        <v-btn large @click="loadNodes()">Update Nodes</v-btn>
+        <v-btn large @click="loadNodes()">(Re-)Load Nodes</v-btn>
+      </v-col>
+      <v-col md="auto">
+        <v-btn large @click="saveChangedNodes()" :disabled="nodesAsyncWithServer.size === 0">Save changed nodes</v-btn>
       </v-col>
     </v-row>
     <v-row v-if="nodeContentKey">
@@ -104,6 +107,7 @@ export default {
       startNode: null,
       nodeHeaderKey: null,
       nodeContentKey: null,
+      nodesAsyncWithServer: new Map(),
     };
   },
   computed: {
@@ -156,6 +160,35 @@ export default {
 
   },
   methods: {
+    async saveChangedNodes() {
+      if (this.nodesAsyncWithServer.size === 0) {
+        return;
+      }
+      const session = this.driver.session();
+      const transaction = session.beginTransaction();
+
+      for (const [elementId, nodeAsyncWithServer] of this.nodesAsyncWithServer) {
+        const query = `
+MATCH (node)
+WHERE elementId(node) = $nodeId
+SET node.${this.nodeContentKey} = $newContent
+`;
+        try {
+          transaction.run(query, {nodeId: elementId, newContent: nodeAsyncWithServer.properties[this.nodeContentKey]});
+        } catch (error) {
+          console.error({error, query});
+          await transaction.rollback();
+          await transaction.close();
+          await session.close();
+          return;
+        }
+      }
+
+      await transaction.commit();
+      await transaction.close();
+      await session.close();
+      this.nodesAsyncWithServer.clear();
+    },
     needsNewLine(text) {
       return text.includes('\n');
     },
@@ -165,12 +198,7 @@ export default {
       const elementId = target.id;
       const node = this.nodes.find(node => node.elementId === elementId);
       node.properties[this.nodeContentKey] = content;
-    },
-    updateNodes() {
-      for (const node of this.nodes) {
-        const element = document.getElementById(node.elementId);
-        node.properties[this.nodeContentKey] = element.innerText
-      }
+      this.nodesAsyncWithServer.set(elementId, node);
     },
     async loadNodeTypes() {
       const query = `MATCH (nodes) RETURN distinct labels(nodes)`;
@@ -217,6 +245,7 @@ WHERE NOT (:${this.nodeType})-[:${this.relationType}]->(subject)
           };
         }
       );
+      this.nodesAsyncWithServer.clear();
     },
 
     async reactToLeaveNode(index, event) {
