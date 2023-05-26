@@ -92,7 +92,7 @@ export default {
     return {
       session: null,
       nodeType: null,
-      nodeTypes: [1, 2, 3],
+      nodeTypes: [],
       relationType: null,
       relationTypes: [],
       nodes: [],
