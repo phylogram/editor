@@ -79,18 +79,22 @@
 import {Driver} from "neo4j-driver";
 import {nextTick} from "vue";
 
+const nodeType_KEY = "nodeType_KEY";
+const relationType_KEY = "relationType_KEY";
+const startNode_KEY = "startNode_KEY";
+const nodeHeaderKey_KEY = "nodeHeaderKey_KEY";
+const nodeContentKey_KEY = "nodeContentKey_KEY";
+
 export default {
   name: 'IndexPage',
   props: {
     driver: Driver,
   },
   beforeMount() {
-    this.session = this.driver.session();
     this.loadNodeTypes();
   },
   data() {
     return {
-      session: null,
       nodeType: null,
       nodeTypes: [],
       relationType: null,
@@ -132,14 +136,24 @@ export default {
   },
   watch: {
     nodeType(_, __) {
+      window.localStorage.setItem(nodeType_KEY, this.nodeType);
       this.loadRelationTypes();
     },
     relationType(_, __) {
+      window.localStorage.setItem(relationType_KEY, this.relationType);
       this.loadStartNodeOptions();
     },
     startNode(_, __) {
+      window.localStorage.setItem(startNode_KEY, this.startNode);
       this.loadNodes();
-    }
+    },
+    nodeHeaderKey(_, __) {
+      window.localStorage.setItem(nodeHeaderKey_KEY, this.nodeHeaderKey);
+    },
+    nodeContentKey(_, __) {
+      window.localStorage.setItem(nodeContentKey_KEY, this.nodeContentKey);
+    },
+
   },
   methods: {
     needsNewLine(text) {
@@ -160,7 +174,7 @@ export default {
     },
     async loadNodeTypes() {
       const query = `MATCH (nodes) RETURN distinct labels(nodes)`;
-      const result = await this.session.executeRead(tx => tx.run(query));
+      const result = await this.driver.executeQuery(query);
       this.nodeTypes = this.getResultFields(result);
     },
     async loadRelationTypes() {
@@ -168,7 +182,7 @@ export default {
         return;
       }
       const query = `MATCH (nodes:${this.nodeType})-[relations]->() RETURN distinct type(relations)`;
-      const result = await this.session.executeRead(tx => tx.run(query));
+      const result = await this.driver.executeQuery(query);
       this.relationTypes = this.getResultFields(result);
     },
     async loadStartNodeOptions() {
@@ -179,7 +193,7 @@ export default {
       const query = `MATCH (subject:${this.nodeType})-[follows:${this.relationType}]->(object:${this.nodeType})
 WHERE NOT (:${this.nodeType})-[:${this.relationType}]->(subject)
  RETURN subject;`;
-      this.startNodeOptions = this.getResultFields( (await this.session.executeRead(tx => tx.run(query))));
+      this.startNodeOptions = this.getResultFields( (await this.driver.executeQuery(query)));
       if (this.startNodeOptions.length > 0) {
         this.startNode = this.startNodeOptions[0].elementId;
       }
@@ -192,7 +206,7 @@ WHERE NOT (:${this.nodeType})-[:${this.relationType}]->(subject)
         return;
       }
       const query = `MATCH graph=(begin:${this.nodeType})-[relation:${this.relationType}*]->(:${this.nodeType}) where elementId(begin) = $startId RETURN nodes(graph) as elements;`
-      const result = await this.session.executeRead(tx => tx.run(query, {startId: this.startNode}));
+      const result = await this.driver.executeQuery(query, {startId: this.startNode});
       const lastRecord = result.records.pop();
       const elements = lastRecord.get('elements');
       this.nodes = elements.map(
@@ -213,31 +227,33 @@ WHERE NOT (:${this.nodeType})-[:${this.relationType}]->(subject)
         return;
       }
       const sourceId = this.nodes[this.nodes.length - 1].elementId;
-      const result = await this.session.executeWrite(tx => tx.run(`CREATE (newText:${this.nodeType} {${this.nodeContentKey}: ""}) RETURN elementId(newText) as newId`));
-      const destinationId = result.records[0].get('newId');
-      console.debug({sourceId, destinationId});
-      await this.session.executeWrite(
-        tx => tx.run(`MATCH (source:${this.nodeType}), (destination:${this.nodeType})
+      const session = this.driver.session();
+      const transaction = session.beginTransaction();
+      const nodeCreateResult = await transaction.run(`CREATE (newText:${this.nodeType} {${this.nodeContentKey}: ""}) RETURN elementId(newText) as newId`);
+      const destinationId = nodeCreateResult.records[0].get('newId');
+      await transaction.run(`
+MATCH (source:${this.nodeType}), (destination:${this.nodeType})
 WHERE elementID(source) = $sourceId AND elementID(destination) = $destinationId
-CREATE (source)-[:${this.relationType}]->(destination);`, {sourceId, destinationId})
+CREATE (source)-[:${this.relationType}]->(destination);`,
+            {sourceId, destinationId}
       );
+      await transaction.commit();
+      await transaction.close();
+      await session.close();
       this.nodes.push({elementId: destinationId, properties: {[this.nodeContentKey]: ''}});
 
       await nextTick();
 
       document.getElementById(destinationId).focus();
     },
-    async closeSession() {
-      this.session.closeSession();
-      console.debug('Closed session');
-    },
   },
   mounted() {
-    window.onbeforeunload = () => this.closeSession();
+    this.nodeType = window.localStorage.getItem(nodeType_KEY);
+    this.relationType = window.localStorage.getItem(relationType_KEY);
+    this.startNode = window.localStorage.getItem(startNode_KEY);
+    this.nodeHeaderKey = window.localStorage.getItem(nodeHeaderKey_KEY);
+    this.nodeContentKey = window.localStorage.getItem(nodeContentKey_KEY);
   },
-  async beforeDestroy() {
-    await this.closeSession();
-  }
 }
 </script>
 <style>
