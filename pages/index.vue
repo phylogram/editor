@@ -21,7 +21,9 @@
     </v-app-bar>
     <v-main>
       <v-container>
-        <editor-playground v-if="connected" :driver="driver" />
+        <KeepAlive>
+          <editor-playground v-if="connected" :driver="driver" />
+        </KeepAlive>
       </v-container>
     </v-main>
   </v-app>
