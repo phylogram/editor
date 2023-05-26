@@ -64,15 +64,14 @@
       </v-col>
     </v-row>
     <v-row v-if="nodeContentKey">
-        <span
+        <node-editor
           v-for="(node, index) in nodes"
           :id="node.elementId"
           @input="updateNode($event)"
-          contenteditable="true"
           @keydown="reactToLeaveNode(index, $event)"
-        >
-          {{node.properties[nodeContentKey]}}
-        </span>
+          :content="node.properties[nodeContentKey]"
+          :element-id="node.elementId"
+        ></node-editor>
 
     </v-row>
   </v-container>
@@ -193,12 +192,9 @@ SET node.${this.nodeContentKey} = $newContent
       return text.includes('\n');
     },
     updateNode(event) {
-      const target = event.target;
-      const content = target.innerText;
-      const elementId = target.id;
-      const node = this.nodes.find(node => node.elementId === elementId);
-      node.properties[this.nodeContentKey] = content;
-      this.nodesAsyncWithServer.set(elementId, node);
+      const node = this.nodes.find(node => node.elementId === event.elementId);
+      node.properties[this.nodeContentKey] = event.content;
+      this.nodesAsyncWithServer.set(event.elementId, node);
     },
     async loadNodeTypes() {
       const query = `MATCH (nodes) RETURN distinct labels(nodes)`;
